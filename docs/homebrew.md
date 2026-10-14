@@ -55,6 +55,9 @@ update notice may still suggest `tinyjs update`; use `brew upgrade tinyjs` for
 this installation. A new upstream release becomes available through Homebrew
 only after the tap maintainer updates the formula.
 
+Use `brew uninstall tinyjs` to remove this installation. The wrapper also rejects
+`tinyjs uninstall` so it cannot remove files from Homebrew's Cellar directly.
+
 For each release, the tap maintainer must update `version`, both architecture
 URLs, and both SHA-256 hashes. Download the archives and the release's
 `checksums.txt` from the same versioned GitHub release, compute each archive's
@@ -73,7 +76,7 @@ brew test --verbose YOUR_ACCOUNT/tinyjs/tinyjs
 
 Use `brew reinstall` in place of `brew install` when testing an already installed
 version. The formula test checks the installed version, rejection of
-self-updates, project creation, application build, and the resulting `.app`'s
+self-updates and self-uninstallation, project creation, application build, and the resulting `.app`'s
 ad-hoc code signature. It does not open a GUI or verify Intel execution on an
 Apple Silicon host.
 

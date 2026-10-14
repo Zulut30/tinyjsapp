@@ -30,6 +30,10 @@ class Tinyjs < Formula
         echo "tinyjs is managed by Homebrew; run brew update && brew upgrade tinyjs" >&2
         exit 1
       fi
+      if [ "$1" = "uninstall" ]; then
+        echo "tinyjs is managed by Homebrew; run brew uninstall tinyjs" >&2
+        exit 1
+      fi
       exec "#{libexec}/bin/tjs" run "#{libexec}/cli.js" "$@"
     SH
   end
@@ -38,12 +42,14 @@ class Tinyjs < Formula
     <<~EOS
       Upgrade this installation with brew update && brew upgrade tinyjs.
       The tinyjs update command is disabled to keep Homebrew's Cellar intact.
+      Remove this installation with brew uninstall tinyjs.
     EOS
   end
 
   test do
     assert_match "tinyjs v#{version}", shell_output("#{bin}/tinyjs version")
     assert_match "brew upgrade tinyjs", shell_output("#{bin}/tinyjs update 2>&1", 1)
+    assert_match "brew uninstall tinyjs", shell_output("#{bin}/tinyjs uninstall --yes 2>&1", 1)
     system bin/"tinyjs", "new", "brew-check"
     cd "brew-check" do
       assert_path_exists "tinyjs.json"
