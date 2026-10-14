@@ -23,7 +23,7 @@ MAC = sys.platform == 'darwin'
 
 def run(argv, cwd):
     result = subprocess.run([str(arg) for arg in argv], cwd=cwd, capture_output=True,
-                            text=True, timeout=180)
+                            text=True, encoding='utf-8', timeout=180)
     assert result.returncode == 0, result.stdout + result.stderr
     return result
 
@@ -163,12 +163,12 @@ def check():
             base = Path(directory).resolve()
             project = base / 'project with spaces ü'
             shutil.copytree(EXAMPLE / 'src', project / 'src')
-            config = json.loads((EXAMPLE / 'tinyjs.json').read_text())
+            config = json.loads((EXAMPLE / 'tinyjs.json').read_text(encoding='utf-8'))
             config['id'] = app_id
-            (project / 'tinyjs.json').write_text(json.dumps(config))
+            (project / 'tinyjs.json').write_text(json.dumps(config), encoding='utf-8')
             report = base / 'report.json'
             backend = project / 'src/backend/main.js'
-            with backend.open('a') as out:
+            with backend.open('a', encoding='utf-8') as out:
                 out.write('\napi.__checkResult = async (result, app) => {\n'
                           '  await tjs.writeFile(' + json.dumps(str(report)) + ', '
                           'new TextEncoder().encode(JSON.stringify(result)));\n'
@@ -179,23 +179,23 @@ def check():
             result = run([TJS, 'run', regression], project)
             print(result.stdout.strip(), flush=True)
             html = project / 'src/frontend/index.html'
-            html.write_text(html.read_text().replace('</head>', '<script src="check.js" defer></script></head>'))
+            html.write_text(html.read_text(encoding='utf-8').replace('</head>', '<script src="check.js" defer></script></head>'), encoding='utf-8')
 
             def stage(name):
-                (project / 'src/frontend/check.js').write_text('const STAGE = ' + json.dumps(name) + ';\n' + CHECK)
+                (project / 'src/frontend/check.js').write_text('const STAGE = ' + json.dumps(name) + ';\n' + CHECK, encoding='utf-8')
 
             def launch(argv, cwd):
                 report.unlink(missing_ok=True)
                 log = base / 'run.log'
-                with log.open('w') as out:
+                with log.open('w', encoding='utf-8') as out:
                     proc = subprocess.Popen([str(arg) for arg in argv], cwd=cwd, stdout=out,
                                             stderr=out, start_new_session=os.name != 'nt')
                     try:
                         deadline = time.monotonic() + 35
                         while not report.exists() and time.monotonic() < deadline and proc.poll() is None:
                             time.sleep(.1)
-                        assert report.exists(), log.read_text()
-                        result = json.loads(report.read_text())
+                        assert report.exists(), log.read_text(encoding='utf-8')
+                        result = json.loads(report.read_text(encoding='utf-8'))
                         assert result.get('ok'), result
                         print('PASS', result['stage'], flush=True)
                     finally:
@@ -212,7 +212,7 @@ def check():
 
             stage('create')
             launch([TJS, 'run', TOOL / 'cli.js', 'dev'], project)
-            assert len(json.loads((data / 'store.json').read_text())['notes']) == 1
+            assert len(json.loads((data / 'store.json').read_text(encoding='utf-8'))['notes']) == 1
             stage('restart')
             launch([TJS, 'run', TOOL / 'cli.js', 'dev'], project)
             stage('built')
@@ -226,7 +226,7 @@ def check():
             else:
                 binary = moved / ('first-notes.exe' if os.name == 'nt' else 'first-notes')
             launch([binary], base)
-            assert json.loads((data / 'store.json').read_text())['notes'] == []
+            assert json.loads((data / 'store.json').read_text(encoding='utf-8'))['notes'] == []
             print('PASS build, relocation, disk contents' + (', ad-hoc signature' if MAC else ''), flush=True)
     finally:
         # Never touch the example's normal app id or another test run's data.
