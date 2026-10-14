@@ -89,8 +89,11 @@ if (!saved) throw new Error('Could not save notes to disk.');
 The store writes JSON using a temporary file and rename. **Check the boolean
 result:** a write failure resolves `false`; it does not reject the promise.
 Its in-memory value can already have changed when a write fails, so the error
-does not mean the previous value has been restored. Keep the editor text and
-resolve the disk problem before relying on persistence.
+does not mean the runtime restored its previous value. The example compensates
+by keeping the last successfully saved array in the backend and advancing it
+only after `store.set` returns `true`. Retrying a failed add therefore creates
+one note; failed edits and deletes do not change that model. Keep the editor
+text and resolve the disk problem before relying on persistence.
 
 The file is `store.json` in the directory selected by the app's `id`:
 
@@ -150,7 +153,9 @@ python3 -u examples/first-app/check.py
 
 Use `python` instead of `python3` if that is your Python 3 command on Windows.
 The check needs a desktop session (or a virtual display on Linux), Python 3.9+
-and the normal host build tools. It drives the real HTML form and bridge,
+and the normal host build tools. It first calls the exported backend with a
+test store that updates memory but reports a failed write, checking successful
+retries of add, edit and delete. It then drives the real HTML form and bridge,
 checks invalid input and overlapping RPC calls, restarts the app to verify
 exact text persistence, then builds and runs a relocated distribution. On
 macOS it also verifies the bundle's ad-hoc signature with `codesign`.

@@ -28,6 +28,47 @@ def run(argv, cwd):
     return result
 
 
+BACKEND_CHECK = '''
+import { api } from './src/backend/main.js';
+function assert(value, message) { if (!value) throw new Error(message); }
+let memory = null;
+let fail = false;
+const app = { store: {
+  async get() { return memory; },
+  async set(_key, value) {
+    memory = value; // Reproduce the runtime: memory changes even on failure.
+    return !fail;
+  },
+} };
+async function fails(method, params) {
+  fail = true;
+  let rejected = false;
+  try { await api[method](params, app); }
+  catch (error) { rejected = error.message.includes('Could not save'); }
+  assert(rejected, method + ' must report a disk failure');
+  fail = false;
+}
+assert((await api.listNotes({}, app)).length === 0, 'initially empty');
+await fails('addNote', { text: 'one note' });
+assert(memory.length === 1, 'failed set changed runtime memory');
+assert((await api.listNotes({}, app)).length === 0, 'failed add leaves saved model empty');
+let notes = await api.addNote({ text: 'one note' }, app);
+assert(notes.length === 1 && memory.length === 1, 'retry adds exactly one note');
+const id = notes[0].id;
+await fails('updateNote', { id, text: 'edited note' });
+assert(memory[0].text === 'edited note', 'failed edit changed runtime memory');
+assert((await api.listNotes({}, app))[0].text === 'one note', 'failed edit keeps saved model');
+notes = await api.updateNote({ id, text: 'edited note' }, app);
+assert(notes.length === 1 && notes[0].text === 'edited note', 'retry edits exactly one note');
+await fails('deleteNote', { id });
+assert(memory.length === 0, 'failed delete changed runtime memory');
+assert((await api.listNotes({}, app)).length === 1, 'failed delete keeps saved model');
+notes = await api.deleteNote({ id }, app);
+assert(notes.length === 0 && memory.length === 0, 'retry deletes the original note');
+console.log('PASS backend write failure and retry: add, edit, delete');
+'''
+
+
 CHECK = r'''
 (async () => {
   function assert(value, message) { if (!value) throw new Error(message); }
@@ -133,6 +174,10 @@ def check():
                           'new TextEncoder().encode(JSON.stringify(result)));\n'
                           '  setTimeout(() => app.quit(), 150);\n'
                           '  return true;\n};\n')
+            regression = project / 'check-backend.js'
+            regression.write_text(BACKEND_CHECK)
+            result = run([TJS, 'run', regression], project)
+            print(result.stdout.strip(), flush=True)
             html = project / 'src/frontend/index.html'
             html.write_text(html.read_text().replace('</head>', '<script src="check.js" defer></script></head>'))
 

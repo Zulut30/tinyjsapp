@@ -2,6 +2,7 @@
 const KEY = 'notes';
 const MAX_TEXT = 2000;
 let sequence = 0;
+let savedNotes = null;
 
 // Keep read/modify/write operations in order, even if calls overlap.
 let pending = Promise.resolve();
@@ -20,13 +21,15 @@ function textFrom(params) {
 }
 
 async function readNotes(app) {
+  if (savedNotes !== null) return savedNotes;
   const notes = await app.store.get(KEY);
-  if (notes === null) return [];
+  if (notes === null) return (savedNotes = []);
   if (!Array.isArray(notes) || notes.some((note) =>
     !note || typeof note.id !== 'string' || typeof note.text !== 'string')) {
     throw new Error('Stored notes have an unexpected format. Back up store.json before changing it.');
   }
-  return notes;
+  savedNotes = notes;
+  return savedNotes;
 }
 
 async function saveNotes(app, notes) {
@@ -34,7 +37,10 @@ async function saveNotes(app, notes) {
   if (!await app.store.set(KEY, notes)) {
     throw new Error('Could not save notes to disk. Keep your text and check available space and permissions.');
   }
-  return notes;
+  // The runtime updates its memory even on failure. Advance our model only
+  // after a successful write, so retrying an add cannot duplicate the note.
+  savedNotes = notes;
+  return savedNotes;
 }
 
 export const api = {
