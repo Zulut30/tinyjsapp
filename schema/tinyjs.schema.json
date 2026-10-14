@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tinyjs application configuration",
+  "description": "Editor assistance for tinyjs.json. The CLI merges the current OS block over the root, then applies environment overrides. Unknown extension fields are allowed. Filesystem and effective configuration checks remain the CLI's responsibility.",
+  "allOf": [{ "$ref": "#/$defs/settings" }],
+  "properties": {
+    "$schema": { "type": "string", "description": "Schema URI used by the editor; ignored by tinyjs." },
+    "macos": { "$ref": "#/$defs/override" },
+    "windows": { "$ref": "#/$defs/override" },
+    "linux": { "$ref": "#/$defs/override" }
+  },
+  "$defs": {
+    "override": {
+      "description": "Partial platform settings. Plain objects merge recursively; arrays and scalars replace root values. null clears a platform block.",
+      "anyOf": [{ "$ref": "#/$defs/settings" }, { "type": "null" }]
+    },
+    "strings": { "type": "array", "items": { "type": "string" } },
+    "optionalString": { "type": ["string", "null"] },
+    "optionalBoolean": { "type": ["boolean", "null"] },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Executable name. The CLI requires a truthy name after platform resolution." },
+        "title": { "$ref": "#/$defs/optionalString", "description": "Window and bundle title; defaults to name when omitted." },
+        "id": { "$ref": "#/$defs/optionalString", "description": "Application identifier; defaults to com.example.<name>." },
+        "version": { "$ref": "#/$defs/optionalString", "description": "Application version." },
+        "minTinyjsVersion": { "$ref": "#/$defs/optionalString", "description": "Oldest tinyjs version needed to run this project." },
+        "size": { "$ref": "#/$defs/optionalString", "description": "Initial window size, for example 960x640." },
+        "backend": { "$ref": "#/$defs/optionalString", "description": "Backend entry path relative to the project; omit for automatic entry discovery." },
+        "frontend": { "$ref": "#/$defs/frontend" },
+        "inject": { "$ref": "#/$defs/optionalString", "description": "Document-start JS or TS file, relative to the project." },
+        "icon": { "$ref": "#/$defs/optionalString", "description": "App icon path; defaults to assets/icon.png, then icon.png." },
+        "attribution": { "$ref": "#/$defs/optionalString", "description": "App attribution displayed by the native launcher." },
+        "helpBook": { "type": "string", "description": "macOS help book folder inside assets/." },
+        "resources": { "$ref": "#/$defs/strings", "description": "Paths inside resources/. Omit to ship the whole folder; [] ships none." },
+        "executables": { "$ref": "#/$defs/strings", "description": "Paths inside executables/. Omit for automatic platform selection; [] ships none." },
+        "executableEntitlements": {
+          "type": "object",
+          "description": "macOS sidecar filename to codesign entitlement keys. The CLI verifies filenames against shipped executables.",
+          "additionalProperties": { "$ref": "#/$defs/strings" }
+        },
+        "signIdentity": { "$ref": "#/$defs/optionalString", "description": "macOS codesign identity; TINYJS_SIGN_IDENTITY takes precedence." },
+        "notarize": {
+          "type": ["object", "null"],
+          "properties": {
+            "profile": { "$ref": "#/$defs/optionalString", "description": "notarytool keychain profile; TINYJS_NOTARY_PROFILE takes precedence." }
+          }
+        },
+        "chrome": { "$ref": "#/$defs/chrome" },
+        "activation": { "enum": ["regular", "accessory", "", false, null], "description": "macOS activation mode; accessory hides the Dock icon." },
+        "mainWindow": { "type": "boolean", "description": "false starts a windowless agent. A remote url needs a main window." },
+        "url": { "$ref": "#/$defs/optionalString", "description": "Remote main page for a site wrapper, instead of a local frontend." },
+        "readAccess": { "type": ["boolean", "string", "null"], "description": "macOS file access root for the page; true grants the home folder." },
+        "userAgent": { "$ref": "#/$defs/optionalString", "description": "Custom webview User-Agent." },
+        "downloads": { "$ref": "#/$defs/optionalString", "description": "Download policy: auto, ask, or deny." },
+        "popups": { "$ref": "#/$defs/optionalString", "description": "Popup policy: external, window, or deny." },
+        "api": { "$ref": "#/$defs/api" },
+        "contextMenu": { "$ref": "#/$defs/optionalBoolean", "description": "false suppresses the webview's default context menu." },
+        "browserAccelerators": { "$ref": "#/$defs/optionalBoolean", "description": "Keep the browser engine's own keyboard shortcuts." },
+        "debug": { "type": ["boolean", "string", "null"], "description": "Enable webview debugging; open also opens developer tools." },
+        "about": { "$ref": "#/$defs/optionalString", "description": "menu routes the native About item to the app's menu handler." },
+        "urlScheme": {
+          "description": "Registered URL scheme, or list of schemes.",
+          "anyOf": [{ "$ref": "#/$defs/optionalString" }, { "$ref": "#/$defs/strings" }]
+        },
+        "fileExtensions": {
+          "description": "Registered document extensions, without leading dots.",
+          "anyOf": [{ "$ref": "#/$defs/strings" }, { "type": "null" }]
+        },
+        "openFolders": { "$ref": "#/$defs/optionalBoolean", "description": "Register the app to open folders." },
+        "permissions": {
+          "type": ["object", "null"],
+          "description": "macOS permission usage descriptions embedded in the bundle.",
+          "properties": {
+            "microphone": { "$ref": "#/$defs/optionalString" },
+            "camera": { "$ref": "#/$defs/optionalString" },
+            "speechRecognition": { "$ref": "#/$defs/optionalString" }
+          }
+        },
+        "audioTap": { "type": ["string", "boolean", "null"], "description": "Declare app or system scope for native audio taps; false disables them." },
+        "audioTapReason": { "$ref": "#/$defs/optionalString", "description": "macOS audio capture usage description." },
+        "windowPlacement": { "$ref": "#/$defs/optionalBoolean", "description": "On Linux, prefer X11/XWayland for app-controlled window placement." },
+        "offscreenRescue": { "$ref": "#/$defs/optionalBoolean", "description": "false disables automatic offscreen window recovery." },
+        "update": {
+          "type": ["object", "null"],
+          "properties": {
+            "url": { "$ref": "#/$defs/optionalString", "description": "URL of the application's update manifest." },
+            "auto": { "type": ["string", "boolean", "null"], "description": "launch or daily checks for updates in packaged apps; false disables automatic checking." }
+          }
+        }
+      }
+    },
+    "frontend": {
+      "type": ["object", "null"],
+      "properties": {
+        "dir": { "$ref": "#/$defs/optionalString", "description": "Plain frontend folder; defaults to src/frontend." },
+        "build": { "$ref": "#/$defs/optionalString", "description": "Shell command to build the production frontend." },
+        "dist": { "$ref": "#/$defs/optionalString", "description": "Frontend build output folder; defaults to dist with a build hook." },
+        "dev": { "$ref": "#/$defs/optionalString", "description": "Shell command to start the frontend development server." },
+        "devUrl": { "$ref": "#/$defs/optionalString", "description": "Development server URL instead of a local page." },
+        "reload": { "$ref": "#/$defs/optionalBoolean", "description": "false disables tinyjs's own frontend file watcher." }
+      }
+    },
+    "chrome": {
+      "type": ["object", "null"],
+      "properties": {
+        "frame": { "$ref": "#/$defs/optionalBoolean", "description": "Show the native window frame." },
+        "windowControls": {
+          "description": "Show all, none, or a list of close/minimize/maximize controls (zoom is an alias for maximize).",
+          "anyOf": [{ "$ref": "#/$defs/optionalBoolean" }, { "$ref": "#/$defs/strings" }]
+        },
+        "transparent": { "$ref": "#/$defs/optionalBoolean" },
+        "vibrancy": { "type": ["string", "boolean", "null"], "description": "macOS vibrancy material, for example hud; null or false disables it." },
+        "squareCorners": { "$ref": "#/$defs/optionalBoolean" },
+        "acceptsFirstMouse": { "$ref": "#/$defs/optionalBoolean" },
+        "menu": { "$ref": "#/$defs/optionalBoolean", "description": "Show the native window menu." },
+        "windowControlsPos": {
+          "description": "macOS traffic-light coordinates; null or false restores the OS layout. Partial coordinates are allowed in platform overrides.",
+          "anyOf": [
+            { "type": "object", "properties": { "x": { "type": "number" }, "y": { "type": "number" } } },
+            { "enum": [null, false] }
+          ]
+        }
+      }
+    },
+    "api": {
+      "description": "Capability gate: all/none/wrapper, boolean, list of allowed wire method names, or an object. Unknown presets fail closed at runtime.",
+      "anyOf": [
+        { "type": ["string", "boolean", "null"] },
+        { "$ref": "#/$defs/strings" },
+        {
+          "type": "object",
+          "properties": {
+            "preset": { "$ref": "#/$defs/optionalString" },
+            "enable": { "anyOf": [{ "$ref": "#/$defs/strings" }, { "type": "null" }] },
+            "disable": { "anyOf": [{ "$ref": "#/$defs/strings" }, { "type": "null" }] },
+            "origins": {
+              "type": ["object", "null"],
+              "description": "Calling frame origin pattern to capability gate. Wildcards match any characters, including dots.",
+              "additionalProperties": { "$ref": "#/$defs/api" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

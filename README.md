@@ -23,6 +23,8 @@ Questions, help, or something you built: come say hi on
 
 ## Install
 
+For a macOS Homebrew custom tap, see the [formula and tap instructions](docs/homebrew.md).
+
 ```sh
 curl -fsSL https://tinyjs.app/install | sh
 ```
@@ -149,6 +151,10 @@ history: [tinyjs.app/changelog](https://tinyjs.app/changelog).
 
 ## Create and run an app
 
+For a complete small example, follow [Your first tinyjs app: a persistent
+notebook](docs/first-app.md) through frontend/backend RPC, local storage and
+building a distribution.
+
 ```sh
 tinyjs new myapp
 cd myapp
@@ -211,6 +217,9 @@ myapp/
   src/frontend/           # index.html + any local js/css/images
   src/shared/             # optional: code both sides import — see below
 ```
+
+For `tinyjs.json` completion and type checks in your editor, see the
+[configuration schema guide](docs/config-schema.md).
 
 Projects made before 0.53 keep `icon.png` (and `Credits.html`) at the
 project root; both are still found there.
@@ -1691,6 +1700,10 @@ valid on your own registered devices — not for distribution. One-time setup:
    the stapled .app). The stapled .app opens anywhere, no warnings.
 
 ### Shipping updates (auto-update)
+
+To authenticate the update manifest with a key pinned in your app, opt in to
+[signed updates](docs/signed-updates.md). That guide covers key storage,
+multi-platform publishing and migration from the unsigned format below.
 
 Point `tinyjs.json` at a manifest you host anywhere (any static host —
 GitHub Releases, S3, nginx):

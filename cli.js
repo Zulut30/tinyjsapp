@@ -8,6 +8,8 @@
 //
 // Runs on txiki.js itself (via the `tinyjs` wrapper script).
 
+import { signManifest, verifyManifest } from './runtime/update-signing.js';
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -928,6 +930,7 @@ async function generateBuild(cfg, dev = false) {
     enc.encode(JSON.stringify({ version: 0, build: {}, main: 'entry.js' })));
   await tjs.writeFile(B + '/bridge.js', await tjs.readFile(TOOL_DIR + 'runtime/bridge.js'));
   await tjs.writeFile(B + '/update.js', await tjs.readFile(TOOL_DIR + 'runtime/update.js'));
+  await tjs.writeFile(B + '/update-signing.js', await tjs.readFile(TOOL_DIR + 'runtime/update-signing.js'));
 
   // Backend: TypeScript (or any entry, with npm packages) bundles via esbuild;
   // plain JS copies sources as before.
@@ -2952,6 +2955,37 @@ async function sha256File(path) {
 
 async function cmdPublish() {
   const cfg = await loadConfig();
+  // Opt in only with an explicit baked publicKey; private material is never
+  // read from config or copied into generated app sources.
+  const publicKey = cfg.update?.publicKey;
+  const keyFile = tjs.env.TINYJS_UPDATE_PRIVATE_KEY_FILE;
+  let signingKey = null;
+  if (publicKey !== undefined) {
+    if (!keyFile) fail('signed updates require TINYJS_UPDATE_PRIVATE_KEY_FILE (external PKCS8 DER file)');
+    try {
+      signingKey = await crypto.subtle.importKey('pkcs8', await tjs.readFile(keyFile), 'Ed25519', false, ['sign']);
+      await signManifest({ version: cfg.version ?? '0.0.0' }, signingKey, publicKey);
+    } catch (e) {
+      fail('cannot sign updates: ' + (e?.message ?? e));
+    }
+  } else if (keyFile) {
+    fail('set update.publicKey before using TINYJS_UPDATE_PRIVATE_KEY_FILE');
+  }
+  const si = args.indexOf('--sign-manifest');
+  if (si >= 0) {
+    if (!signingKey || !args[si + 1]) fail('--sign-manifest FILE requires update.publicKey and a private key');
+    const path = args[si + 1];
+    try {
+      const manifest = JSON.parse(dec.decode(await tjs.readFile(path)));
+      if (manifest?.format === 'tinyjs-update-v1') fail('--sign-manifest expects the final plain merged manifest');
+      const signed = await signManifest(manifest, signingKey, publicKey);
+      await tjs.writeFile(path, enc.encode(JSON.stringify(signed, null, 2) + '\n'));
+    } catch (e) {
+      fail('cannot sign manifest: ' + (e?.message ?? e));
+    }
+    console.log('==> signed ' + path);
+    return;
+  }
   const version = cfg.version;
   if (!version) fail('tinyjs.json needs a "version" to publish (e.g. "1.0.0")');
   const PUB = 'dist/publish';
@@ -2967,7 +3001,10 @@ async function cmdPublish() {
   await cmdBuild();
   let prev = null;
   if (MAC_SUFFIX && (await exists(KEEP))) {
-    try { prev = JSON.parse(dec.decode(await tjs.readFile(KEEP + '/manifest.json'))); } catch {}
+    try {
+      prev = JSON.parse(dec.decode(await tjs.readFile(KEEP + '/manifest.json')));
+      if (publicKey !== undefined) prev = await verifyManifest(prev, publicKey);
+    } catch { prev = null; }
     // Another version's leftovers don't belong in this release.
     if (prev?.version === version) await tjs.rename(KEEP, PUB);
     else prev = null;
@@ -3039,7 +3076,8 @@ async function cmdPublish() {
       ? dec.decode(await tjs.readFile(args[ni + 1])).trim()
       : args[ni + 1];
   }
-  await tjs.writeFile(PUB + '/manifest.json', enc.encode(JSON.stringify(manifest, null, 2) + '\n'));
+  const output = signingKey ? await signManifest(manifest, signingKey, publicKey) : manifest;
+  await tjs.writeFile(PUB + '/manifest.json', enc.encode(JSON.stringify(output, null, 2) + '\n'));
 
   console.log('==> dist/publish/ ready:');
   for (const z of Object.values(manifest.mac ?? {}).map((m) => m.url.replace(/.*\//, '')).filter((z) => z !== zipName))
@@ -3065,6 +3103,53 @@ async function cmdVersion() {
   console.log('tinyjs ' + v + ' (txiki.js ' + tjs.version + ')');
 }
 
+// Availability checks only: never launch a window, rebuild, or contact a server.
+async function cmdDoctor() {
+  if (args.length) fail('usage: tinyjs doctor (no arguments)');
+  await cmdVersion();
+  console.log('Platform: ' + EXEC_OS + ' (' + (globalThis.navigator?.platform ?? 'unknown') + ')');
+  console.log('CPU: ' + (tjs.system?.cpus?.[0]?.model || 'unknown'));
+  console.log('Installation: ' + TOOL_DIR);
+  console.log('Running runtime: ' + tjs.exePath);
+  let errors = 0;
+  async function checkFile(label, path, fix) {
+    try {
+      const st = await tjs.stat(path);
+      if (!st.isFile || !st.size)
+        throw new Error('expected a non-empty regular file');
+      if (!IS_WIN && !(st.mode & 0o111))
+        throw new Error('no executable permission bits; run chmod +x on this file');
+      console.log('OK: ' + label + ': ' + path);
+    } catch (e) {
+      errors++;
+      console.log('FAIL: ' + label + ': ' + path + ' (' + String(e) + ')');
+      console.log('      ' + fix);
+    }
+  }
+  const restore = 'Release install: reinstall tinyjs using the README installation instructions. ' +
+    'Source checkout: run ' + (IS_WIN ? 'setup.ps1' : './setup.sh') + ' from the installation directory.';
+  await checkFile('Bundled runtime', TOOL_DIR + 'bin/' + (IS_WIN ? 'tjs.exe' : 'tjs'), restore);
+  const launcher = TOOL_DIR + 'native/' + (IS_WIN ? 'launcher-win.exe' : IS_LINUX ? 'launcher-linux' : 'launcher-macos');
+  await checkFile('Bundled launcher', launcher, restore);
+  if (tjs.env.TINYJS_LAUNCHER) {
+    console.log('NOTE: TINYJS_LAUNCHER overrides the launcher for dev; builds still use the bundled launcher.');
+    await checkFile('Dev launcher override', tjs.env.TINYJS_LAUNCHER,
+      'Correct or unset TINYJS_LAUNCHER before running tinyjs dev.');
+  }
+  if (IS_WIN) {
+    console.log('WARN: WebView2 Runtime is not checked. If windows fail to open, install the Microsoft Edge WebView2 Evergreen Runtime (see README).');
+  } else if (IS_LINUX) {
+    console.log('WARN: WebKitGTK and shared libraries are not checked. Install the WebKitGTK 4.1 runtime (Debian/Ubuntu: sudo apt install libwebkit2gtk-4.1-0; openSUSE: sudo zypper install libwebkit2gtk-4_1-0).');
+    if (!tjs.env.DISPLAY && !tjs.env.WAYLAND_DISPLAY)
+      console.log('WARN: neither DISPLAY nor WAYLAND_DISPLAY is set. Run tinyjs dev from a graphical desktop session.');
+  } else {
+    console.log('NOTE: macOS supplies WebKit; no compiler is required for a release install.');
+  }
+  console.log('NOTE: file availability does not verify binary architecture, shared libraries, permissions enforced by the OS, or that a window can open.');
+  console.log('doctor: ' + errors + ' error(s). No files changed.');
+  tjs.exit(errors ? 1 : 0);
+}
+
 // Apple-Silicon-first: the bundled tjs runtime is arm64, so an app built or run
 // on an Intel Mac won't launch on Apple Silicon (and vice-versa). Heads-up for
 // devs — non-fatal, since local dev with the x86_64 build still works. Apple
@@ -3087,6 +3172,7 @@ switch (cmd) {
   case 'new': await cmdNew(); break;
   case 'wrap': await cmdWrap(); break;
   case 'dev': await cmdDev(); break;
+  case 'doctor': await cmdDoctor(); break;
   case 'build': await cmdBuild(); break;
   case 'publish': await cmdPublish(); break;
   case 'notarize': await cmdNotarize(); break;
@@ -3119,6 +3205,8 @@ usage:
   tinyjs publish      build + zip the .app + auto-update manifest (takes --arch /
                       --universal; run once per --arch, the manifest merges both)
                       (--notes "text" | --notes-file FILE → manifest notes)
+                      (--sign-manifest FILE: sign a final merged manifest without building;
+                      requires update.publicKey + TINYJS_UPDATE_PRIVATE_KEY_FILE)
   tinyjs notarize     submit dist/<Name>.app to Apple notarization + staple
                       (--dmg: also rebuild dist/<name>-<version>.dmg from the
                       stapled .app; auto-rebuilt if a dmg already exists;
@@ -3126,6 +3214,7 @@ usage:
   tinyjs update       update the tinyjs CLI itself (--check: only report,
                       --dry-run: print what it would run)
   tinyjs uninstall    remove ~/.tinyjs and the PATH symlink (--yes: no prompt)
+  tinyjs doctor       check runtime and launcher availability (read-only)
   tinyjs version      print version`);
     tjs.exit(cmd ? 1 : 0);
 }
