@@ -89,11 +89,12 @@ def trial(argv, cwd, timeout, interval):
         env = dict(os.environ, TINYJS_BENCH_NONCE=nonce, TINYJS_BENCH_READY=str(marker))
         with open(Path(temp) / 'output', 'w+b') as output:
             start = time.perf_counter()
+            deadline = start + timeout
             process = subprocess.Popen(argv, cwd=cwd, env=env, start_new_session=True,
                                        stdin=subprocess.DEVNULL, stdout=output, stderr=output)
             status, elapsed = 'timeout', None
             try:
-                while time.perf_counter() - start < timeout:
+                while time.perf_counter() < deadline:
                     if process.poll() is not None:
                         status = 'premature_exit'
                         break
@@ -108,7 +109,9 @@ def trial(argv, cwd, timeout, interval):
                             else:
                                 status, elapsed = 'ready', time.perf_counter() - start
                             break
-                    time.sleep(interval)
+                    remaining = deadline - time.perf_counter()
+                    if remaining > 0:
+                        time.sleep(min(interval, remaining))
             finally:
                 stop(process)
             output.seek(0, os.SEEK_END)

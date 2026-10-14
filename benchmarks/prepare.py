@@ -9,8 +9,11 @@ import zlib
 
 def prepare(framework, destination):
     source = Path(__file__).resolve().parent
-    if destination.exists():
+    if destination.exists() or destination.is_symlink():
         raise ValueError(f"destination already exists: {destination}")
+    destination = destination.resolve()
+    if destination.is_relative_to(source.parent):
+        raise ValueError(f'destination must be outside the checkout: {destination}')
     shutil.copytree(source / 'adapters' / framework, destination)
     frontend = destination / ('src/frontend' if framework == 'tinyjs' else 'frontend')
     shutil.copytree(source / 'workload', frontend)
@@ -37,6 +40,6 @@ if __name__ == '__main__':
     parser.add_argument('destination', type=Path)
     args = parser.parse_args()
     try:
-        prepare(args.framework, args.destination.resolve())
+        prepare(args.framework, args.destination)
     except (OSError, ValueError) as error:
         parser.error(str(error))

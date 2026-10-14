@@ -99,6 +99,40 @@ while True:
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('already exists', result.stderr)
 
+    def test_prepare_refuses_checkout_destinations_before_copying(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            alias = Path(temp) / 'checkout-alias'
+            alias.symlink_to(ROOT.parent, target_is_directory=True)
+            candidates = [ROOT / 'adapters/tinyjs/never-copy-here',
+                          ROOT / 'never-copy-here', ROOT.parent / 'never-copy-here',
+                          alias / 'never-copy-here']
+            for destination in candidates:
+                with self.subTest(destination=destination), patch('prepare.shutil.copytree') as copy:
+                    with self.assertRaisesRegex(ValueError, 'outside the checkout'):
+                        prepare('tinyjs', destination)
+                    copy.assert_not_called()
+
+    def test_prepare_refuses_dangling_symlink_via_cli(self):
+        with tempfile.TemporaryDirectory() as temp:
+            destination = Path(temp) / 'dangling'
+            target = Path(temp) / 'missing'
+            destination.symlink_to(target, target_is_directory=True)
+            result = subprocess.run([sys.executable, str(ROOT / 'prepare.py'), 'tinyjs',
+                                     str(destination)], capture_output=True, text=True, timeout=5)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('already exists', result.stderr)
+            self.assertTrue(destination.is_symlink())
+            self.assertFalse(target.exists())
+
+    def test_poll_cannot_extend_readiness_timeout(self):
+        import time
+        start = time.perf_counter()
+        result = trial([sys.executable, '-c', 'import time; time.sleep(10)'],
+                       str(ROOT), 0.05, 86400)
+        self.assertEqual(result['status'], 'timeout')
+        self.assertLess(time.perf_counter() - start, 0.75)
+
     def test_sizes_hashes_and_symlinks(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'app'
