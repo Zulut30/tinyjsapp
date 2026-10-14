@@ -138,3 +138,13 @@ jobs:
         if: runner.os != 'Linux'
         timeout-minutes: 5
         run: python -u examples/first-app/check.py
+
+      - name: Verify benchmark (Linux desktop session)
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: dbus-run-session -- xvfb-run -a python -u benchmarks/check.py --tinyjs-smoke
+
+      - name: Verify benchmark (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: python -u benchmarks/check.py --tinyjs-smoke
