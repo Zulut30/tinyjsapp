@@ -160,6 +160,12 @@ checks invalid input and overlapping RPC calls, restarts the app to verify
 exact text persistence, then builds and runs a relocated distribution. On
 macOS it also verifies the bundle's ad-hoc signature with `codesign`.
 
+On Windows, keep the checkout and temporary directory under ASCII paths. The
+bundled runtime can corrupt Unicode script paths passed in command-line arguments,
+so the check uses fixture folder names with spaces but no Unicode on Windows.
+It still checks Unicode note contents and UTF-8 JSON there. A passing Windows
+run does **not** verify Unicode paths; POSIX fixture paths retain Unicode.
+
 It runs in a temporary source copy with a unique test app id, has finite
 process timeouts and removes only that run's data directory. It does not
 read or clear the notebook's normal saved notes. A passing run checks the
