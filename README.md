@@ -1879,6 +1879,9 @@ TINYJS_HTML=/path/to/tinyjs/test/smoke.html tinyjs dev
 The same page also runs against a built `dist/<name>` or the `.app`'s
 `Contents/MacOS/<name>` via the same env var.
 
+For repeatable startup and artifact-size measurements across tinyjs, Electron
+and Tauri, see the [benchmark harness and methodology](benchmarks/README.md).
+
 ### Gotchas discovered along the way (txiki.js v26.6.0)
 
 - `tjs.spawn(..., {stdin:'pipe'})` delivered only the first write to the
