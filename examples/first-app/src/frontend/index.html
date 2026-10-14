@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>First Notes</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>First Notes</h1>
+    <p>A small notebook saved on this computer.</p>
+    <form id="editor">
+      <fieldset id="controls" disabled>
+        <label for="text">Note (up to 2000 characters)</label>
+        <textarea id="text" rows="5" maxlength="2000" required></textarea>
+        <button id="save" type="submit">Add note</button>
+        <button id="cancel" type="button" hidden>Cancel edit</button>
+      </fieldset>
+    </form>
+    <p id="status" role="status">Loading notes…</p>
+    <p id="error" role="alert"></p>
+    <ul id="notes" aria-label="Saved notes"></ul>
+    <p id="empty" hidden>No notes yet. Write your first one above.</p>
+  </main>
+</body>
+</html>

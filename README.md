@@ -149,6 +149,10 @@ history: [tinyjs.app/changelog](https://tinyjs.app/changelog).
 
 ## Create and run an app
 
+For a complete small example, follow [Your first tinyjs app: a persistent
+notebook](docs/first-app.md) through frontend/backend RPC, local storage and
+building a distribution.
+
 ```sh
 tinyjs new myapp
 cd myapp
