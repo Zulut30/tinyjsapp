@@ -1,0 +1,1 @@
+{"productName":"Startup Benchmark","version":"0.1.0","identifier":"com.tinyjs.startup-benchmark-tauri","build":{"frontendDist":"frontend"},"app":{"withGlobalTauri":true,"windows":[{"title":"Startup benchmark","width":800,"height":600} ]},"bundle":{"active":false}}
