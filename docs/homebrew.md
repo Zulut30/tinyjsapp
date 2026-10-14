@@ -58,8 +58,8 @@ only after the tap maintainer updates the formula.
 Use `brew uninstall tinyjs` to remove this installation. The wrapper also rejects
 `tinyjs uninstall` so it cannot remove files from Homebrew's Cellar directly.
 
-For each release, the tap maintainer must update `version`, both architecture
-URLs, and both SHA-256 hashes. Download the archives and the release's
+For each release, the tap maintainer must update both architecture URLs (the
+version is inferred from them) and both SHA-256 hashes. Download the archives and the release's
 `checksums.txt` from the same versioned GitHub release, compute each archive's
 SHA-256, and compare it with the published checksum before changing the formula.
 Check the runtime's minimum macOS version again if it changes.

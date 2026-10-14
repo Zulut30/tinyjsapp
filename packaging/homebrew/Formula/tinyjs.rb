@@ -1,7 +1,6 @@
 class Tinyjs < Formula
   desc "Build tiny native apps with JavaScript and the system webview"
   homepage "https://tinyjs.app"
-  version "0.56.0"
   license "MIT"
 
   depends_on :macos
